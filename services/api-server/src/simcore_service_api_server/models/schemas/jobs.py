@@ -4,6 +4,7 @@ import logging
 from typing import Any, ClassVar, TypeAlias
 from uuid import UUID, uuid4
 
+from models_library.jobs import JobID
 from models_library.projects import ProjectID
 from models_library.projects_nodes_io import NodeID
 from models_library.projects_state import RunningState
@@ -32,8 +33,6 @@ from ..api_resources import (
     compose_resource_name,
     split_resource_name,
 )
-
-JobID: TypeAlias = UUID
 
 # ArgumentTypes are types used in the job inputs (see ResultsTypes)
 ArgumentTypes: TypeAlias = (

@@ -3,9 +3,10 @@ from typing import Any, ClassVar, Literal
 
 import packaging.version
 from models_library.basic_regex import PUBLIC_VARIABLE_NAME_RE
-from models_library.services import COMPUTATIONAL_SERVICE_KEY_RE, ServiceDockerData
+from models_library.jobs import SolverKeyId
+from models_library.services import ServiceDockerData
 from packaging.version import Version
-from pydantic import BaseModel, ConstrainedStr, Extra, Field, HttpUrl
+from pydantic import BaseModel, Extra, Field, HttpUrl
 
 from ..api_resources import compose_resource_name
 from ..basic_types import VersionStr
@@ -27,11 +28,6 @@ LATEST_VERSION = "latest"
 # SOLVER ----------
 #
 SOLVER_RESOURCE_NAME_RE = r"^solvers/([^\s/]+)/releases/([\d\.]+)$"
-
-
-class SolverKeyId(ConstrainedStr):
-    strip_whitespace = True
-    regex = COMPUTATIONAL_SERVICE_KEY_RE
 
 
 class Solver(BaseModel):

@@ -51,7 +51,7 @@ def upgrade():
         sa.DDL(
             f"""
 INSERT INTO projects_to_api_server_jobs (project_uuid, job_id, solver_key, solver_version)
-SELECT uuid, uuid, replace(substring(name from '(.*)/releases'), '%2F', '/'), substring(name from 'releases/(.*)/jobs')
+SELECT uuid, uuid, replace(substring(name from 'solvers/(.*)/releases'), '%2F', '/'), substring(name from 'releases/(.*)/jobs')
 FROM projects
 WHERE name ~ 'simcore%2Fservices%2Fcomp%2F.*/releases/.*/jobs/.*'
 """

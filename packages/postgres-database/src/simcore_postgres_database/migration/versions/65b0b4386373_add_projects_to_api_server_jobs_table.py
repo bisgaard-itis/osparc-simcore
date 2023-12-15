@@ -1,15 +1,15 @@
-"""introduce api server jobs table
+"""add projects_to_api_server_jobs table
 
-Revision ID: 401d3573c0df
+Revision ID: 65b0b4386373
 Revises: 0ad000429e3d
-Create Date: 2023-12-14 13:44:32.708929+00:00
+Create Date: 2023-12-15 08:53:34.257538+00:00
 
 """
 import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = "401d3573c0df"
+revision = "65b0b4386373"
 down_revision = "0ad000429e3d"
 branch_labels = None
 depends_on = None
@@ -23,7 +23,6 @@ def upgrade():
         sa.Column("job_id", sa.String(), nullable=False),
         sa.Column("solver_key", sa.String(), nullable=True),
         sa.Column("solver_version", sa.String(), nullable=True),
-        sa.Column("study_key", sa.String(), nullable=True),
         sa.Column(
             "created",
             sa.DateTime(timezone=True),
@@ -39,17 +38,6 @@ def upgrade():
         sa.ForeignKeyConstraint(
             ["project_uuid"], ["projects.uuid"], name="project_uuid"
         ),
-        sa.ForeignKeyConstraint(
-            ["solver_key"], ["services_meta_data.key"], name="Service key for solver"
-        ),
-        sa.ForeignKeyConstraint(
-            ["solver_version"],
-            ["services_meta_data.version"],
-            name="The version of the solver",
-        ),
-        sa.ForeignKeyConstraint(
-            ["study_key"], ["services_meta_data.key"], name="The key for the study"
-        ),
         sa.PrimaryKeyConstraint("job_id"),
         sa.UniqueConstraint("job_id"),
     )
@@ -58,6 +46,16 @@ def upgrade():
         "projects_to_api_server_jobs",
         ["project_uuid"],
         unique=False,
+    )
+    op.execute(
+        sa.DDL(
+            f"""
+INSERT INTO projects_to_api_server_jobs (project_uuid, job_id, solver_key, solver_version)
+SELECT uuid, uuid, replace(substring(name from '(.*)/releases'), '%2F', '/'), substring(name from 'releases/(.*)/jobs')
+FROM projects
+WHERE name ~ 'simcore%2Fservices%2Fcomp%2F.*/releases/.*/jobs/.*'
+"""
+        )
     )
     # ### end Alembic commands ###
 

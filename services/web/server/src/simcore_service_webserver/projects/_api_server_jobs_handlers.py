@@ -2,7 +2,6 @@ import logging
 
 from aiohttp import web
 from aiohttp_security import login_required
-from models_library.api_schemas_webserver.api_server_jobs import ApiServerJobGet
 from servicelib.aiohttp.requests_validation import parse_request_query_parameters_as
 from simcore_service_webserver.security.decorators import permission_required
 

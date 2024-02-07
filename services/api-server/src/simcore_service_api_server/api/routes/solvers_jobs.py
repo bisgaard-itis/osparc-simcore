@@ -11,6 +11,10 @@ from models_library.api_schemas_webserver.projects import ProjectCreateNew, Proj
 from models_library.clusters import ClusterID
 from pydantic.types import PositiveInt
 from servicelib.logging_utils import log_context
+from simcore_service_api_server.api.errors.custom_errors import (
+    InsufficientCredits,
+    MissingWallet,
+)
 
 from ...models.basic_types import VersionStr
 from ...models.schemas.errors import ErrorGet
@@ -63,6 +67,19 @@ def _raise_if_job_not_associated_with_solver(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"job {project.uuid} is not associated with solver {solver_key} and version {version}",
         )
+
+
+async def raise_if_negative_credits(job_id: JobID, webserver_api: AuthSession):
+    product_price = await webserver_api.get_product_price()
+    if product_price is not None:
+        wallet = await webserver_api.get_project_wallet(project_id=job_id)
+        if wallet is None:
+            raise MissingWallet(f"Job {job_id} does not have an associated wallet.")
+        wallet_with_credits = await webserver_api.get_wallet(wallet_id=wallet.wallet_id)
+        if wallet_with_credits.available_credits < 0.0:
+            raise InsufficientCredits(
+                f"Wallet '{wallet_with_credits.name}' does not have any credits. Please add some before performing this operation."
+            )
 
 
 # JOBS ---------------
@@ -179,6 +196,8 @@ async def start_job(
 
     job_name = _compose_job_resource_name(solver_key, version, job_id)
     _logger.debug("Start Job '%s'", job_name)
+
+    await raise_if_negative_credits(job_id, webserver_api)
 
     if pricing_spec := JobPricingSpecification.create_from_headers(request.headers):
         with log_context(_logger, logging.DEBUG, "Set pricing plan and unit"):

@@ -44,7 +44,6 @@ from simcore_service_api_server.services.director_v2 import (
 from simcore_service_api_server.services.log_streaming import (
     LogDistributor,
     LogStreamer,
-    LogStreamerNotRegistered,
     LogStreamerRegistionConflict,
 )
 from tenacity import AsyncRetrying, retry_if_not_exception_type, stop_after_delay
@@ -367,14 +366,13 @@ async def log_streamer_with_distributor(
     )
 
     assert isinstance(d2_client := DirectorV2Api.get_instance(app), DirectorV2Api)
-    async with LogStreamer(
+    yield LogStreamer(
         user_id=user_id,
         director2_api=d2_client,
         job_id=project_id,
         log_distributor=log_distributor,
         log_check_timeout=1,
-    ) as log_streamer:
-        yield log_streamer
+    )
 
     assert len(log_distributor._log_streamers.keys()) == 0
 
@@ -457,8 +455,20 @@ async def test_log_generator(mocker: MockFixture, faker: Faker):
         "simcore_service_api_server.services.log_streaming.LogStreamer._project_done",
         return_value=True,
     )
-    log_streamer = LogStreamer(user_id=3, director2_api=None, job_id=None, log_distributor=None, log_check_timeout=1)  # type: ignore
-    log_streamer._is_registered = True
+
+    @dataclass
+    class MockLogDistributor:
+        register_called: bool = False
+        deregister_called: bool = False
+
+        async def register(self, a, b):
+            self.register_called = True
+
+        async def deregister(self, a):
+            self.deregister_called = True
+
+    log_distributor = MockLogDistributor()
+    log_streamer = LogStreamer(user_id=3, director2_api=None, job_id=None, log_distributor=log_distributor, log_check_timeout=1)  # type: ignore
 
     published_logs: list[str] = []
     for _ in range(10):
@@ -475,13 +485,8 @@ async def test_log_generator(mocker: MockFixture, faker: Faker):
         collected_logs.append(job_log.messages[0])
 
     assert published_logs == collected_logs
-
-
-async def test_log_generator_context(mocker: MockFixture, faker: Faker):
-    log_streamer = LogStreamer(user_id=3, director2_api=None, job_id=None, log_distributor=None, log_check_timeout=1)  # type: ignore
-    with pytest.raises(LogStreamerNotRegistered):
-        async for log in log_streamer.log_generator():
-            print(log)
+    assert log_distributor.register_called
+    assert log_distributor.deregister_called
 
 
 @pytest.mark.parametrize("is_healthy", [True, False])

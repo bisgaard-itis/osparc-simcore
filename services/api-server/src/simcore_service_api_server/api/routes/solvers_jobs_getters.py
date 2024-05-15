@@ -20,7 +20,6 @@ from pydantic import NonNegativeInt
 from pydantic.types import PositiveInt
 from servicelib.fastapi.requests_decorators import cancel_on_disconnect
 from servicelib.logging_utils import log_context
-from starlette.background import BackgroundTask
 
 from ...models.basic_types import LogStreamingResponse, VersionStr
 from ...models.pagination import Page, PaginationParams
@@ -441,8 +440,6 @@ async def get_log_stream(
             log_distributor=log_distributor,
             log_check_timeout=log_check_timeout,
         )
-        await log_streamer.setup()
         return LogStreamingResponse(
             log_streamer.log_generator(),
-            background=BackgroundTask(log_streamer.teardown),
         )

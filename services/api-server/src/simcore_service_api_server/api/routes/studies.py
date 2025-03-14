@@ -2,6 +2,7 @@ import logging
 from typing import Annotated, Final
 
 from fastapi import APIRouter, Depends, Header, status
+from fastapi.responses import PlainTextResponse
 from fastapi_pagination.api import create_page
 from models_library.api_schemas_webserver.projects import ProjectGet
 from models_library.projects import ProjectID
@@ -10,7 +11,7 @@ from models_library.projects_nodes_io import NodeID
 from ...api.routes._constants import FMSG_CHANGELOG_NEW_IN_VERSION
 from ...models.pagination import OnePage, Page, PaginationParams
 from ...models.schemas.errors import ErrorGet
-from ...models.schemas.studies import Study, StudyID, StudyPort
+from ...models.schemas.studies import Study, StudyID, StudyNodes, StudyPort
 from ...services_http.webserver import AuthSession
 from ..dependencies.webserver_http import get_webserver_session
 
@@ -109,3 +110,21 @@ async def list_study_ports(
         project_id=study_id
     )
     return OnePage[StudyPort](items=project_ports)
+
+
+@router.post(
+    "",
+    response_model=Study,
+    responses={**_COMMON_ERROR_RESPONSES},
+    description="Create a study\n\n" + FMSG_CHANGELOG_NEW_IN_VERSION.format("0.8.0"),
+)
+async def create_study(
+    study_nodes: StudyNodes,
+    webserver_api: Annotated[AuthSession, Depends(get_webserver_session)],
+):
+    if len(study_nodes.nodes) > 1:
+        return PlainTextResponse(
+            content="Currently only a single study_node is supported",
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        )
+    raise NotImplementedError("Not yet implemented")

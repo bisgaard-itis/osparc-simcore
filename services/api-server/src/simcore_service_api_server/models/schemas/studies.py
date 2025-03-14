@@ -1,7 +1,9 @@
 from typing import Annotated, TypeAlias
+from uuid import UUID
 
 from models_library import projects, projects_nodes_io
-from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field
+from models_library.services_types import ServiceKey, ServiceVersion
+from pydantic import AfterValidator, AnyHttpUrl, BaseModel, ConfigDict, Field
 
 from ...models._utils_pydantic import UriSchema
 from .. import api_resources
@@ -54,3 +56,25 @@ class LogLink(BaseModel):
 
 class JobLogsMap(BaseModel):
     log_links: list[LogLink] = Field(..., description="Array of download links")
+
+
+class _Node(BaseModel):
+    id: UUID
+    service_key: ServiceKey
+    service_version: ServiceVersion
+
+
+def _check_unique_ids(nodes: list[_Node]) -> list[_Node]:
+    # validate that there are no duplicate ids
+    ids = {node.id for node in nodes}
+    if len(ids) != len(nodes):
+        raise ValueError("Duplicate node ids found")
+    return nodes
+
+
+class StudyNodes(BaseModel):
+    nodes: Annotated[
+        list[_Node],
+        AfterValidator(_check_unique_ids),
+        Field(min_length=1, description="Array of service keys and versions"),
+    ]

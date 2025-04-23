@@ -234,7 +234,64 @@ async def test_create_user_notification(
         assert error is not None
 
 
-@pytest.mark.parametrize("user_role", [(UserRole.USER)])
+@pytest.mark.parametrize(
+    "user_role,expected_response",
+    [
+        (UserRole.ANONYMOUS, status.HTTP_401_UNAUTHORIZED),
+        (UserRole.GUEST, status.HTTP_403_FORBIDDEN),
+        (UserRole.USER, status.HTTP_204_NO_CONTENT),
+        (UserRole.TESTER, status.HTTP_204_NO_CONTENT),
+    ],
+)
+@pytest.mark.parametrize(
+    "notification_dict",
+    [
+        pytest.param(
+            {
+                "user_id": "1",
+                "category": NotificationCategory.NEW_ORGANIZATION,
+                "actionable_path": "organization/40",
+                "title": "New organization",
+                "text": "You're now member of a new Organization",
+                "date": "2023-02-23T16:23:13.122Z",
+                "product": "osparc",
+            }
+        ),
+    ],
+)
+async def test_create_and_list_user_notification(
+    logged_user: UserInfoDict,
+    notification_redis_client: aioredis.Redis,
+    client: TestClient,
+    notification_dict: dict[str, Any],
+    expected_response: HTTPStatus,
+):
+    assert client.app
+    url = client.app.router["create_user_notification"].url_for()
+    assert str(url) == "/v0/me/notifications"
+    notification_dict["user_id"] = logged_user["id"]
+
+    # create 10 notifications
+    for _ in range(10):
+        resp = await client.post(url.path, json=notification_dict)
+        data, error = await assert_status(resp, expected_response)
+        assert data is None  # 204...
+
+    resp = await client.get(client.app.router["list_user_notifications"].url_for().path)
+    assert resp.status == status.HTTP_200_OK
+
+    body = await resp.json()
+    notifications = body.get("data")
+    assert notifications
+    resp = await client.get(
+        client.app.router["mark_notification_as_read"]
+        .url_for(notification_id=notifications[0]["id"])
+        .path
+    )
+    assert resp.status == status.HTTP_200_OK
+
+
+@pytest.mark.parametrize("user_role", [UserRole.USER])
 @pytest.mark.parametrize(
     "notification_count",
     [
@@ -290,7 +347,7 @@ async def test_create_user_notification_capped_list_length(
     assert len(user_notifications) <= MAX_NOTIFICATIONS_FOR_USER_TO_KEEP
 
 
-@pytest.mark.parametrize("user_role", [(UserRole.USER)])
+@pytest.mark.parametrize("user_role", [UserRole.USER])
 async def test_create_user_notification_per_product(
     logged_user: UserInfoDict,
     notification_redis_client: aioredis.Redis,

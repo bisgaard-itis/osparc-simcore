@@ -11,6 +11,8 @@ from simcore_service_webserver.users._notifications import (
     get_notification_key,
 )
 
+pytest_simcore_core_services_selection = ["redis"]
+
 
 @pytest.mark.parametrize(
     "raw_data", UserNotification.model_config["json_schema_extra"]["examples"]

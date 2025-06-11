@@ -15,7 +15,9 @@ from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.trace import Span
 from servicelib.logging_utils import log_context
+from servicelib.tracing import add_headers_to_span
 from settings_library.tracing import TracingSettings
 from yarl import URL
 
@@ -185,7 +187,17 @@ def initialize_fastapi_app_tracing(app: FastAPI):
 
 
 def setup_httpx_client_tracing(client: AsyncClient | Client):
-    HTTPXClientInstrumentor.instrument_client(client)
+    async def request_hook(span: Span, request):
+        if span and span.is_recording():
+            add_headers_to_span(span, request.headers)
+
+    def response_hook(span, response):
+        if span and span.is_recording():
+            add_headers_to_span(span, response.headers)
+
+    HTTPXClientInstrumentor().instrument_client(
+        client, request_hook=request_hook, response_hook=response_hook
+    )
 
 
 def setup_tracing(

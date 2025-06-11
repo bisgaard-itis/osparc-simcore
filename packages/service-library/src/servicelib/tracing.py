@@ -1,9 +1,11 @@
 from contextlib import contextmanager
 from typing import TypeAlias
 
+from multidict import MultiDict
 from opentelemetry import context as otcontext
 from opentelemetry import trace
 from opentelemetry.instrumentation.logging import LoggingInstrumentor
+from opentelemetry.trace.span import Span
 from settings_library.tracing import TracingSettings
 
 TracingContext: TypeAlias = otcontext.Context | None
@@ -34,3 +36,10 @@ def use_tracing_context(context: TracingContext):
 def setup_log_tracing(tracing_settings: TracingSettings):
     _ = tracing_settings
     LoggingInstrumentor().instrument(set_logging_format=False)
+
+
+def add_headers_to_span(span: Span, headers: MultiDict):
+    if span is not None and span.is_recording():
+        for header, value in headers.items():
+            attr_name = f"http.header.{header}"
+            span.set_attribute(attr_name, value)

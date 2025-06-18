@@ -3,7 +3,7 @@
 # dependencies = [
 #     "httpx",
 #     "matplotlib",
-#     "osparc>=0.8.3.post0.dev26",
+#     "osparc>=0.8.3.post0.dev30",
 #     "tenacity",
 #     "tqdm",
 # ]
@@ -14,6 +14,7 @@ import argparse
 import json
 import os
 from datetime import datetime, timedelta
+from enum import StrEnum
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -32,6 +33,11 @@ assert _VALUES_FILE.is_file(), f"Values file not found: {_VALUES_FILE}"
 
 _SOLVER_KEY = "simcore/services/comp/s4l-python-runner"
 _SOLVER_VERSION = "1.2.130"
+
+
+class FinalJobStatus(StrEnum):
+    SUCCESS = "SUCCESS"
+    FAILED = "FAILED"
 
 
 def main(njobs: int, log_job: bool = False):
@@ -107,6 +113,8 @@ def main(njobs: int, log_job: bool = False):
             function_jobs = api_instance.map_function(
                 function_id=function_id,
                 request_body=inputs,
+                x_simcore_parent_node_id="null",
+                x_simcore_parent_project_uuid="null",
             )
 
             print(f"function_jobs: {function_jobs.to_dict()}")
@@ -118,14 +126,21 @@ def main(njobs: int, log_job: bool = False):
                 solver_job_id = job.actual_instance.solver_job_id
                 print_job_logs(configuration, solver_job_id)
 
-            for job_uid in tqdm(
+            for function_job_uid in tqdm(
                 function_job_ids, desc="Waiting for jobs to complete", unit="job"
             ):
-                status = wait_until_done(job_api_instance, job_uid)
-                job_statuses[status] = job_statuses.get(status, 0) + 1
+                status = wait_until_done(job_api_instance, function_job_uid)
+                job = job_api_instance.get_function_job(function_job_uid)
+                solver_job_id = job.actual_instance.solver_job_id
+
+                job_ids = job_statuses.get(status, [])
+                job_ids.append(job.actual_instance.solver_job_id)
+                job_statuses[status] = job_ids
 
             statuses = list(job_statuses.keys())
-            counts = [job_statuses[status] for status in statuses]
+            counts = [len(job_statuses[status]) for status in statuses]
+
+            print(f"Solver job_ids which failed: {job_statuses.get('FAILED', [])}")
 
             plt.figure(figsize=(6, 4))
             plt.bar(statuses, counts, color="skyblue")
@@ -155,12 +170,12 @@ def main(njobs: int, log_job: bool = False):
 @retry(
     stop=stop_after_delay(timedelta(minutes=10)),
     wait=wait_exponential(multiplier=1, min=1, max=5),
-    retry=retry_if_exception_type(AssertionError),
+    retry=retry_if_exception_type(ValueError),
     reraise=True,
 )
 def wait_until_done(function_api: osparc_client.FunctionJobsApi, function_job_uid: str):
     job_status = function_api.function_job_status(function_job_uid).status
-    assert job_status in ("SUCCESS", "FAILED")
+    _ = FinalJobStatus(job_status)  # check job done
     return job_status
 
 

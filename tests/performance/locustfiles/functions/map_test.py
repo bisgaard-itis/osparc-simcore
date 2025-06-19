@@ -35,9 +35,10 @@ _SOLVER_KEY = "simcore/services/comp/s4l-python-runner"
 _SOLVER_VERSION = "1.2.130"
 
 
-class FinalJobStatus(StrEnum):
+class JobStatus(StrEnum):
     SUCCESS = "SUCCESS"
     FAILED = "FAILED"
+    PENDING = "PENDING"
 
 
 def main(njobs: int, log_job: bool = False):
@@ -133,9 +134,9 @@ def main(njobs: int, log_job: bool = False):
                 job = job_api_instance.get_function_job(function_job_uid)
                 solver_job_id = job.actual_instance.solver_job_id
 
-                job_ids = job_statuses.get(status, [])
+                job_ids = job_statuses.get(status.value, [])
                 job_ids.append(job.actual_instance.solver_job_id)
-                job_statuses[status] = job_ids
+                job_statuses[status.value] = job_ids
 
             statuses = list(job_statuses.keys())
             counts = [len(job_statuses[status]) for status in statuses]
@@ -170,13 +171,16 @@ def main(njobs: int, log_job: bool = False):
 @retry(
     stop=stop_after_delay(timedelta(minutes=10)),
     wait=wait_exponential(multiplier=1, min=1, max=5),
-    retry=retry_if_exception_type(ValueError),
+    retry=retry_if_exception_type((AssertionError, ValueError)),
     reraise=True,
 )
-def wait_until_done(function_api: osparc_client.FunctionJobsApi, function_job_uid: str):
+def wait_until_done(
+    function_api: osparc_client.FunctionJobsApi, function_job_uid: str
+) -> JobStatus:
     job_status = function_api.function_job_status(function_job_uid).status
-    _ = FinalJobStatus(job_status)  # check job done
-    return job_status
+    _status = JobStatus(job_status)  # check job done
+    assert _status in (JobStatus.SUCCESS, JobStatus.FAILED)
+    return _status
 
 
 @retry(

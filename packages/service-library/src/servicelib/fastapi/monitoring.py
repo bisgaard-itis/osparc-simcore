@@ -49,22 +49,25 @@ class PrometheusMiddleware(BaseHTTPMiddleware):
 
         start_time = perf_counter()
         try:
-            with no_task_leaks(
+            async with no_task_leaks(
                 action="log", enable_creation_tracking=True, logger=_logger
-            ), record_request_metrics(
-                metrics=self.metrics,
-                method=request.method,
-                endpoint=canonical_endpoint,
-                user_agent=user_agent,
             ):
-                response = await call_next(request)
-                status_code = response.status_code
+                with record_request_metrics(
+                    metrics=self.metrics,
+                    method=request.method,
+                    endpoint=canonical_endpoint,
+                    user_agent=user_agent,
+                ):
+                    response = await call_next(request)
+                    status_code = response.status_code
 
-                # path_params are not available before calling call_next
-                # https://github.com/encode/starlette/issues/685#issuecomment-550240999
-                for k, v in request.path_params.items():
-                    key = "{" + k + "}"
-                    canonical_endpoint = canonical_endpoint.replace(f"/{v}", f"/{key}")
+                    # path_params are not available before calling call_next
+                    # https://github.com/encode/starlette/issues/685#issuecomment-550240999
+                    for k, v in request.path_params.items():
+                        key = "{" + k + "}"
+                        canonical_endpoint = canonical_endpoint.replace(
+                            f"/{v}", f"/{key}"
+                        )
         except Exception:  # pylint: disable=broad-except
             # NOTE: The prometheus metrics middleware should be "outside" exception handling
             # middleware. See https://fastapi.tiangolo.com/advanced/middleware/#adding-asgi-middlewares

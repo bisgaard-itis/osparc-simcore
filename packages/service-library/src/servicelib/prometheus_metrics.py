@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -43,7 +44,9 @@ class PrometheusMetrics:
     in_flight_requests: Gauge
     response_latency_with_labels: Histogram
     event_loop_tasks: Gauge
+    event_loop_tasks_detailed: Gauge
     event_loop_lag: Gauge
+    task_id_timestamps: dict[str, datetime.datetime]
 
 
 def _get_exemplar() -> dict[str, str] | None:
@@ -100,6 +103,13 @@ def get_prometheus_metrics() -> PrometheusMetrics:
         registry=registry,
     )
 
+    event_loop_tasks_detailed = Gauge(
+        name="asyncio_event_loop_tasks_detailed",
+        documentation="Detailed number of tasks in the asyncio event loop",
+        labelnames=["task_id"],
+        registry=registry,
+    )
+
     event_loop_lag = Gauge(
         name="asyncio_event_loop_lag_seconds",
         documentation="Time between scheduling and execution of event loop callbacks. >10ms consistently indicates event loop saturation",
@@ -116,7 +126,9 @@ def get_prometheus_metrics() -> PrometheusMetrics:
         in_flight_requests=in_flight_requests,
         response_latency_with_labels=response_latency_with_labels,
         event_loop_tasks=event_loop_tasks,
+        event_loop_tasks_detailed=event_loop_tasks_detailed,
         event_loop_lag=event_loop_lag,
+        task_id_timestamps={},
     )
 
 
@@ -165,7 +177,27 @@ def record_response_metrics(
 
 async def record_asyncio_event_looop_metrics(metrics: PrometheusMetrics) -> None:
 
-    metrics.event_loop_tasks.set(len(asyncio.all_tasks()))
+    all_tasks = asyncio.all_tasks()
+    metrics.event_loop_tasks.set(len(all_tasks))
+
+    # update tasks
+    current_task_keys = {f"{id(task)}" for task in all_tasks}
+    old_task_keys = set(metrics.task_id_timestamps.keys())
+    # remove old tasks
+    for old_task_key in old_task_keys - current_task_keys:
+        del metrics.task_id_timestamps[old_task_key]
+    # add new tasks
+    now = datetime.datetime.now()
+    for current_task_key in current_task_keys - old_task_keys:
+        metrics.task_id_timestamps[current_task_key] = now
+    metrics.task_id_timestamps
+
+    metrics.event_loop_tasks_detailed.clear()
+    for task in all_tasks:
+        task_id = f"{id(task)}"
+        task_timestamp = metrics.task_id_timestamps.get(task_id)
+        if task_timestamp and (now - task_timestamp) > datetime.timedelta(minutes=5):
+            metrics.event_loop_tasks_detailed.labels(task_id=task_id).set(1)
 
     start_time = time.perf_counter()
     await asyncio.sleep(0)  # Yield control to event loop

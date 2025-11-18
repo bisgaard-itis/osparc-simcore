@@ -13,6 +13,7 @@ from prometheus_client.openmetrics.exposition import (
     CONTENT_TYPE_LATEST,
     generate_latest,
 )
+from pyleak import no_task_leaks
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.types import ASGIApp
 
@@ -48,7 +49,9 @@ class PrometheusMiddleware(BaseHTTPMiddleware):
 
         start_time = perf_counter()
         try:
-            with record_request_metrics(
+            with no_task_leaks(
+                action="log", enable_creation_tracking=True, logger=_logger
+            ), record_request_metrics(
                 metrics=self.metrics,
                 method=request.method,
                 endpoint=canonical_endpoint,

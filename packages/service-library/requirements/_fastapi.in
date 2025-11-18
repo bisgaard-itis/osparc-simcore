@@ -12,3 +12,4 @@ httpx[http2]
 opentelemetry-instrumentation-fastapi
 opentelemetry-instrumentation-httpx
 prometheus-client
+pyleak

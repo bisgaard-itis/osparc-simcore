@@ -19,7 +19,6 @@ docker
 Faker
 fakeredis[lua]
 flaky
-pyleak
 pytest
 pytest-asyncio
 pytest-cov

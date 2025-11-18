@@ -44,7 +44,7 @@ class PrometheusMetrics:
     in_flight_requests: Gauge
     response_latency_with_labels: Histogram
     event_loop_tasks: Gauge
-    event_loop_tasks_detailed: Gauge
+    event_loop_tasks_minutes: Gauge
     event_loop_lag: Gauge
     task_id_timestamps: dict[str, datetime.datetime]
 
@@ -103,9 +103,9 @@ def get_prometheus_metrics() -> PrometheusMetrics:
         registry=registry,
     )
 
-    event_loop_tasks_detailed = Gauge(
+    event_loop_tasks_minutes = Gauge(
         name="asyncio_event_loop_tasks_detailed",
-        documentation="Detailed number of tasks in the asyncio event loop",
+        documentation="Time a tasks in the asyncio event loop has lived in minutes",
         labelnames=["task_id"],
         registry=registry,
     )
@@ -126,7 +126,7 @@ def get_prometheus_metrics() -> PrometheusMetrics:
         in_flight_requests=in_flight_requests,
         response_latency_with_labels=response_latency_with_labels,
         event_loop_tasks=event_loop_tasks,
-        event_loop_tasks_detailed=event_loop_tasks_detailed,
+        event_loop_tasks_minutes=event_loop_tasks_minutes,
         event_loop_lag=event_loop_lag,
         task_id_timestamps={},
     )
@@ -190,14 +190,13 @@ async def record_asyncio_event_looop_metrics(metrics: PrometheusMetrics) -> None
     now = datetime.datetime.now()
     for current_task_key in current_task_keys - old_task_keys:
         metrics.task_id_timestamps[current_task_key] = now
-    metrics.task_id_timestamps
 
-    metrics.event_loop_tasks_detailed.clear()
-    for task in all_tasks:
-        task_id = f"{id(task)}"
-        task_timestamp = metrics.task_id_timestamps.get(task_id)
+    metrics.event_loop_tasks_minutes.clear()
+    for task_id, task_timestamp in metrics.task_id_timestamps.items():
         if task_timestamp and (now - task_timestamp) > datetime.timedelta(minutes=10):
-            metrics.event_loop_tasks_detailed.labels(task_id=task_id).set(1)
+            metrics.event_loop_tasks_minutes.labels(task_id=task_id).set(
+                int((now - task_timestamp).total_seconds()) / 60
+            )
 
     start_time = time.perf_counter()
     await asyncio.sleep(0)  # Yield control to event loop

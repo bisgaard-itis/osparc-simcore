@@ -196,7 +196,7 @@ async def record_asyncio_event_looop_metrics(metrics: PrometheusMetrics) -> None
     for task in all_tasks:
         task_id = f"{id(task)}"
         task_timestamp = metrics.task_id_timestamps.get(task_id)
-        if task_timestamp and (now - task_timestamp) > datetime.timedelta(minutes=5):
+        if task_timestamp and (now - task_timestamp) > datetime.timedelta(minutes=10):
             metrics.event_loop_tasks_detailed.labels(task_id=task_id).set(1)
 
     start_time = time.perf_counter()

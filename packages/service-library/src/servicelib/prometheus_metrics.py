@@ -193,7 +193,7 @@ async def record_asyncio_event_looop_metrics(metrics: PrometheusMetrics) -> None
 
     metrics.event_loop_tasks_minutes.clear()
     for task_id, task_timestamp in metrics.task_id_timestamps.items():
-        if task_timestamp and (now - task_timestamp) > datetime.timedelta(minutes=10):
+        if (now - task_timestamp) > datetime.timedelta(minutes=10):
             metrics.event_loop_tasks_minutes.labels(task_id=task_id).set(
                 int((now - task_timestamp).total_seconds() / 60)
             )

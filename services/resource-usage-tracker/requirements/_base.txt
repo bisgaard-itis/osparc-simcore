@@ -154,6 +154,8 @@ email-validator==2.1.1
     # via
     #   fastapi
     #   pydantic
+exceptiongroup==1.3.0
+    # via pyleak
 fast-depends==2.4.12
     # via faststream
 fastapi==0.116.1
@@ -639,6 +641,8 @@ pyinstrument==5.1.1
     # via
     #   -r requirements/../../../packages/aws-library/requirements/../../../packages/service-library/requirements/_base.in
     #   -r requirements/../../../packages/service-library/requirements/_base.in
+pyleak==0.1.14
+    # via -r requirements/../../../packages/service-library/requirements/_fastapi.in
 pyparsing==3.1.2
     # via matplotlib
 python-dateutil==2.9.0.post0

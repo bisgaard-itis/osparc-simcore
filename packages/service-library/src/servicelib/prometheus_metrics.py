@@ -16,6 +16,8 @@ from prometheus_client import (
 )
 from prometheus_client.registry import CollectorRegistry
 
+_BOOT_TIME: Final[datetime.datetime] = datetime.datetime.now()
+
 #
 # CAUTION CAUTION CAUTION NOTE:
 # Be very careful with metrics. pay attention to metrics cardinatity.
@@ -193,11 +195,9 @@ async def record_asyncio_event_looop_metrics(metrics: PrometheusMetrics) -> None
 
     metrics.event_loop_tasks_minutes.clear()
     for task_id, task_timestamp in metrics.task_id_timestamps.items():
-        if (
-            datetime.timedelta(minutes=20)
-            > (now - task_timestamp)
-            > datetime.timedelta(minutes=10)
-        ):
+        if (now - task_timestamp) > datetime.timedelta(minutes=1) and (
+            task_timestamp - _BOOT_TIME
+        ) > datetime.timedelta(minutes=2):
             metrics.event_loop_tasks_minutes.labels(task_id=task_id).set(
                 int((now - task_timestamp).total_seconds() / 60)
             )

@@ -181,7 +181,8 @@ def record_response_metrics(
 async def record_asyncio_event_looop_metrics(metrics: PrometheusMetrics) -> None:
 
     all_tasks = asyncio.all_tasks()
-    metrics.event_loop_tasks.set(len(all_tasks))
+    all_running_tasks = [task for task in all_tasks if not task.done()]
+    metrics.event_loop_tasks.set(len(all_running_tasks))
 
     # update tasks
     current_task_keys = {f"{id(task)}" for task in all_tasks}

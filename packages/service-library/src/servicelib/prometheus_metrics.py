@@ -185,7 +185,7 @@ async def record_asyncio_event_looop_metrics(metrics: PrometheusMetrics) -> None
     metrics.event_loop_tasks.set(len(all_running_tasks))
 
     # update tasks
-    current_task_keys = {f"{id(task)}" for task in all_tasks}
+    current_task_keys = {f"{id(task)}" for task in all_running_tasks}
     old_task_keys = set(metrics.task_id_timestamps.keys())
     # remove old tasks
     for old_task_key in old_task_keys - current_task_keys:
@@ -196,13 +196,17 @@ async def record_asyncio_event_looop_metrics(metrics: PrometheusMetrics) -> None
         metrics.task_id_timestamps[current_task_key] = now
 
     metrics.event_loop_tasks_minutes.clear()
-    for task_id, task_timestamp in metrics.task_id_timestamps.items():
-        if (now - task_timestamp) > datetime.timedelta(minutes=1) and (
-            task_timestamp - _BOOT_TIME
-        ) > datetime.timedelta(minutes=2):
-            metrics.event_loop_tasks_minutes.labels(task_id=task_id).set(
-                int((now - task_timestamp).total_seconds() / 60)
-            )
+    for task in all_running_tasks:
+        task_id = f"{id(task)}"
+        if task_id in metrics.task_id_timestamps:
+            task_name = task.get_name()
+            task_timestamp = metrics.task_id_timestamps[task_id]
+            if (now - task_timestamp) > datetime.timedelta(minutes=1) and (
+                task_timestamp - _BOOT_TIME
+            ) > datetime.timedelta(minutes=2):
+                metrics.event_loop_tasks_minutes.labels(
+                    task_id=f"{task_name=} {task_id=}"
+                ).set(int((now - task_timestamp).total_seconds() / 60))
 
     start_time = time.perf_counter()
     await asyncio.sleep(0)  # Yield control to event loop

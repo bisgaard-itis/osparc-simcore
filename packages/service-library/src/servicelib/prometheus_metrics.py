@@ -4,6 +4,7 @@ import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
+from typing import Final
 
 from opentelemetry import trace
 from prometheus_client import (
